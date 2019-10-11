@@ -1,0 +1,856 @@
+// $Id: $
+///////////////////////////////////////////////////////////////////////////////
+///
+/// @file       bstring.cpp
+/// @brief      bstring 클래스 구현
+/// @author     Jongkap Jeong <jongkap@mail.com>
+/// @date       2008/11/13 - 처음작성
+///
+/// Copyright (C) Jongkap Jeong, Ltd. All Rights Reserved.
+///
+///////////////////////////////////////////////////////////////////////////////
+
+#include "jfx.h"
+
+#include <string.h>
+#include <stdarg.h>
+
+__BEGIN_NAMESPACE_JFX
+
+#define IO_BUF_MAX 1024  ///< 확장할 IO 버퍼 크기
+
+namespace
+{
+	byte_t NULL_VAL = 0x00;
+}
+
+bstring::bstring()
+{
+	m_bstr = 0;
+	m_size = 0;
+	m_max_size = 0;
+	m_offset = 0;
+}
+
+bstring::bstring(byte_t* bstr, size_t size)
+{
+	m_bstr = 0;
+	m_size = 0;
+	m_max_size = 0;
+	m_offset = 0;
+	
+	bstrcpy(bstr, size);
+}
+
+bstring::bstring(const char* cstr)
+{
+	m_bstr = 0;
+	m_size = 0;
+	m_max_size = 0;
+	m_offset = 0;
+	
+	bstrcpy(cstr);
+}
+
+bstring::bstring(const bstring& rhs)
+{
+	m_bstr = 0;
+	m_size = 0;
+	m_max_size = 0;
+	m_offset = 0;
+	
+	bstrcpy(rhs.data(), rhs.size());
+}
+
+bstring::~bstring()
+{
+	if (m_bstr) free();
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn bool bstring::empty()
+/// @brief	스트링 비어있음 여부
+/// @return 데이터 없음: ture, 데이터 있음: false
+///////////////////////////////////////////////////////////////////////////////
+bool bstring::empty()
+{
+	if ((m_bstr == 0) || (m_size == 0)) return true;
+	return false;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn bool bstring::end()
+/// @brief	오프셋이 길이와 같은지 여부
+/// @return 같음: ture, 작음: false
+///////////////////////////////////////////////////////////////////////////////
+bool bstring::end()
+{
+	if (m_offset >= m_size) return true;
+	return false;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn size_t& bstring::offset()
+/// @brief	현재 오프셋 위치
+/// @return	오프셋
+///////////////////////////////////////////////////////////////////////////////
+size_t bstring::offset()
+{
+	return m_offset;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn void bstring::setsize(size_t n)
+/// @brief	스트링 길이 설정
+/// @param	n	[in] 길이
+///////////////////////////////////////////////////////////////////////////////
+void bstring::setsize(size_t n)
+{
+	m_size = n;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn void bstring::setaddsize(size_t n)
+/// @brief	스트링 추가 길이 설정
+/// @param	n	[in] 추가 길이
+///////////////////////////////////////////////////////////////////////////////
+void bstring::setaddsize(size_t n)
+{
+	m_size += n;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn void bstring::setoffset(size_t n)
+/// @brief	스트링 오프셋 설정
+/// @param	n	[in] 오프셋
+///////////////////////////////////////////////////////////////////////////////
+void bstring::setoffset(size_t n)
+{
+	m_offset = n;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn void bstring::seek(size_t n)
+/// @brief	스트링 오프셋 설정
+/// @param	n	[in] 오프셋
+///////////////////////////////////////////////////////////////////////////////
+void bstring::seek(size_t n)
+{
+	setoffset(n);
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn size_t bstring::size() const
+/// @brief	스트링 길이
+/// @return	길이
+///////////////////////////////////////////////////////////////////////////////
+size_t bstring::size() const
+{
+	return m_size;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn size_t& bstring::size()
+/// @brief	스트링 길이
+/// @return	길이
+///////////////////////////////////////////////////////////////////////////////
+size_t& bstring::size()
+{
+	return m_size;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn size_t bstring::length() const
+/// @brief	스트링 길이
+/// @return	길이
+///////////////////////////////////////////////////////////////////////////////
+size_t bstring::length() const
+{
+	return size();
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn size_t& bstring::length()
+/// @brief	스트링 길이
+/// @return	길이
+///////////////////////////////////////////////////////////////////////////////
+size_t& bstring::length()
+{
+	return size();
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn size_t bstring::max_size() const
+/// @brief	최대 버퍼 크기
+/// @return	길이
+///////////////////////////////////////////////////////////////////////////////
+size_t bstring::max_size() const
+{
+	return m_max_size;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn size_t& bstring::max_size()
+/// @brief	최대 버퍼 크기
+/// @return	길이
+///////////////////////////////////////////////////////////////////////////////
+size_t& bstring::max_size()
+{
+	return m_max_size;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn byte_t bstring::at(size_t n) const
+/// @brief	n번째 글자 (zero-based)
+/// @param	n	[in] 인덱스
+/// @return 데이터
+///////////////////////////////////////////////////////////////////////////////
+byte_t bstring::at(size_t n) const
+{
+	if ((n < 0) || (n >= size())) return NULL_VAL;
+	return m_bstr[n];
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn byte_t& bstring::at(size_t n)
+/// @brief	n번째 글자 (zero-based)
+/// @param	n	[in] 인덱스
+/// @return 데이터
+///////////////////////////////////////////////////////////////////////////////
+byte_t& bstring::at(size_t n)
+{
+	if ((n < 0) || (n >= size())) return NULL_VAL;
+	return m_bstr[n];
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn byte_t bstring::next()
+/// @brief	현재 오프셋 반환 및 증가
+/// @return 데이터
+///////////////////////////////////////////////////////////////////////////////
+byte_t bstring::next()
+{
+	byte_t data = m_bstr[m_offset++];
+	
+	if (m_offset > m_size) m_offset = m_size;
+	return data;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn byte_t bstring::previous()
+/// @brief	현재 오프셋 반환 및 감소
+/// @return 데이터
+///////////////////////////////////////////////////////////////////////////////
+byte_t bstring::previous()
+{
+	byte_t data = m_bstr[m_offset--];
+	
+	if (m_offset < 0) m_offset = 0;
+	return data;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn const char* bstring::c_str() const
+/// @brief	스트링 const char*
+/// @return 스트링
+///////////////////////////////////////////////////////////////////////////////
+const char* bstring::c_str() const
+{
+	if (m_bstr) return (const char*)m_bstr;
+	return (const char*)"";
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn byte_t* bstring::data() const
+/// @brief	데이터 byte_t*
+/// @return 데이터
+///////////////////////////////////////////////////////////////////////////////
+byte_t* bstring::data() const
+{
+	return m_bstr;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn byte_t*& bstring::data()
+/// @brief	데이터 byte_t*
+/// @return 데이터
+///////////////////////////////////////////////////////////////////////////////
+byte_t*& bstring::data()
+{
+	return m_bstr;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn byte_t*& bstring::dataptr()
+/// @brief	버퍼 포인터
+/// @return 데이터 포인터
+///////////////////////////////////////////////////////////////////////////////
+byte_t*& bstring::dataptr()
+{
+	return m_bstr;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn size_t& bstring::sizeptr()
+/// @brief	버퍼 길이 포인터
+/// @return 길이 포인터
+///////////////////////////////////////////////////////////////////////////////
+size_t* bstring::sizeptr()
+{
+	return &m_size;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn bool bstring::writable(size_t n)
+/// @brief	저장할 공간 있는지 여부
+/// @param	n	[in] 길이
+/// @return 공간 있음: ture, 공간 없음: false
+///////////////////////////////////////////////////////////////////////////////
+bool bstring::writable(size_t n)
+{
+	if ((m_max_size - m_size) > n) return true;
+	return false;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn void bstring::free()
+/// @brief	할당 메모리 해제
+///////////////////////////////////////////////////////////////////////////////
+void bstring::free()
+{
+	if (m_bstr) 
+	{
+		clear();
+		delete[] m_bstr;
+	}
+
+	m_bstr = 0;
+	m_size = 0;
+	m_max_size = 0;
+	m_offset = 0;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn void bstring::clear()
+/// @brief	버퍼 초기화
+///////////////////////////////////////////////////////////////////////////////
+void bstring::clear()
+{
+	if (m_bstr == 0) return;
+		
+	memset(m_bstr, 0, m_max_size+1);
+	m_size = 0;
+	m_offset = 0;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn void bstring::allocation(size_t n)
+/// @brief	버퍼 할당
+/// @param	n	[in] 길이
+///////////////////////////////////////////////////////////////////////////////
+void bstring::allocation(size_t n)
+{
+	if (m_bstr && (m_max_size < n)) free();
+	if (m_bstr == 0) reallocation(n);
+	clear();
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn void bstring::alloc(size_t n)
+/// @brief	버퍼 할당
+/// @param	n	[in] 길이
+///////////////////////////////////////////////////////////////////////////////
+void bstring::alloc(size_t n)
+{
+	allocation(n);
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn void bstring::malloc(size_t n)
+/// @brief	버퍼 할당
+/// @param	n	[in] 길이
+///////////////////////////////////////////////////////////////////////////////
+void bstring::malloc(size_t n)
+{
+	allocation(n);
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn void bstring::malloc_and_size(size_t n)
+/// @brief	버퍼 할당 및 버퍼 크기 설정
+/// @param	n	[in] 길이
+///////////////////////////////////////////////////////////////////////////////
+void bstring::malloc_and_setsize(size_t n)
+{
+	malloc(n);
+	m_size = n;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn void bstring::reallocation(size_t n)
+/// @brief	버퍼 재 할당
+/// @param	n	[in] 길이
+///////////////////////////////////////////////////////////////////////////////
+void bstring::reallocation(size_t n)
+{
+	byte_t* bk_str = 0;
+	
+	// 기존 버퍼로 충분하면 재 할당 하지 않는다.
+	if (m_bstr && (m_max_size >= n)) return;
+
+	// 기존 버퍼 백업
+	if (m_bstr && (m_size > 0))
+	{
+		bk_str = new byte_t[m_size];
+		memset(bk_str, 0, m_size);
+		memcpy(bk_str, m_bstr, m_size);
+
+	}
+	
+	// 추가할 최대 버퍼 크기 구하기
+	while (true)
+	{
+		m_max_size += IO_BUF_MAX;
+		if (m_max_size >= (m_size + n)) break;
+	}
+	
+	if (m_bstr) delete[] m_bstr;
+	m_bstr = new byte_t[m_max_size+1];
+	memset(m_bstr, 0, m_max_size+1);
+
+	// 기존 버퍼 내용 저장
+	if (bk_str)
+	{
+		memcpy(m_bstr, bk_str, m_size);
+		memset(bk_str, 0, m_size);
+		delete[] bk_str;
+	}
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn void bstring::realloc(size_t n)
+/// @brief	버퍼 재 할당
+/// @param	n	[in] 길이
+///////////////////////////////////////////////////////////////////////////////
+void bstring::realloc(size_t n)
+{
+	reallocation(n);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn void bstring::bstrcpy(const byte_t* bstr, size_t n)
+/// @brief	스트링 버퍼에 bstr 저장
+/// @param	bstr	[in] 버퍼
+/// @param	n		[in] 길이
+///////////////////////////////////////////////////////////////////////////////
+void bstring::bstrcpy(const byte_t* bstr, size_t n)
+{
+	allocation(n);
+	append(bstr, n);
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn void bstring::bstrcpy(const char* cstr)
+/// @brief	스트링 버퍼에 cstr 저장
+/// @param	cstr	[in] 버퍼
+///////////////////////////////////////////////////////////////////////////////
+void bstring::bstrcpy(const char* cstr)
+{
+	bstrcpy((byte_t*)cstr, strlen(cstr));
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn void bstring::append(const byte_t* bstr, size_t n)
+/// @brief	스트링 버퍼에 bstr 추가
+/// @param	bstr	[in] 버퍼
+/// @param	n		[in] 길이
+///////////////////////////////////////////////////////////////////////////////
+void bstring::append(const byte_t* bstr, size_t n)
+{
+	if (!writable(n)) reallocation(n);
+
+	memcpy(m_bstr+m_size, bstr, n);
+	m_size += n;
+	m_bstr[m_size] = '\0';
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn void bstring::append(const char* cstr)
+/// @brief	스트링 버퍼에 cstr 추가
+/// @param	cstr	[in] 버퍼
+///////////////////////////////////////////////////////////////////////////////
+void bstring::append(const char* cstr)
+{
+	append((byte_t*)cstr, strlen(cstr));
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn void bstring::format(const char* cstr)
+/// @brief	스트링 버퍼를 포맷 스트링으로 설정
+/// @param  fmt         [in] 포맷
+/// @param  ...         [in] 인수리스트
+///////////////////////////////////////////////////////////////////////////////
+void bstring::format(const char* fmt, ...)
+{
+    va_list args;
+    int n, size = 1024;
+    byte_t* value = 0;     
+    
+    if (fmt == 0) return;
+	free();
+
+    while (true)
+    {
+		if (value) 
+		{			
+			delete[] value;
+			value = 0;
+		}
+        value = new byte_t[size+1];
+        if (value == 0) return;
+        
+        memset(value, 0, size+1);
+        
+        va_start(args, fmt); 
+        n = vsnprintf((char*)value, size, fmt, args);
+        va_end(args);
+        
+        if ((n > -1) && (n < size))
+        {
+            value[n] = '\0';
+
+            bstrcpy(value, n);
+			memset(value, 0, n);
+			delete[] value;
+            break;
+        }
+        
+        size *= 2;
+    }
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn void bstring::replace(size_t pos, size_t len, const byte_t* bstr, size_t n)
+/// @brief	스트링 버퍼의 pos 위치에 bstr로 교체
+/// @param	pos		[in] 교체할 위치
+/// @param	len		[in] 교체할 길이
+/// @param	bstr	[in] 버퍼
+/// @param	n		[in] 버퍼 길이
+///////////////////////////////////////////////////////////////////////////////
+void bstring::replace(size_t pos, size_t len,
+		const byte_t* bstr, size_t n)
+{
+	if (len <= n) memcpy(m_bstr+pos, bstr, len);
+	else
+	{
+		memset(m_bstr+pos, 0, len);
+		memcpy(m_bstr+pos, bstr, n);
+	}
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn void bstring::replace(size_t pos, size_t len, const char* cstr)
+/// @brief	스트링 버퍼의 pos 위치에 cstr로 교체
+/// @param	pos		[in] 교체할 위치
+/// @param	len		[in] 교체할 길이
+/// @param	cstr	[in] 버퍼
+///////////////////////////////////////////////////////////////////////////////
+void bstring::replace(size_t pos, size_t len, const char* cstr)
+{
+	if (len <= strlen(cstr)) memcpy(m_bstr+pos, cstr, len);
+	else
+	{
+		memset(m_bstr+pos, 0, len);
+		memcpy(m_bstr+pos, cstr, strlen(cstr));
+	}
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn size_t bstring::read(byte_t* bstr, size_t n)
+/// @brief	스트링 버퍼에서 n길이만큼 데이터 읽기
+/// @param	bstr	[out] 버퍼
+/// @param	n		[in] 읽을 길이
+/// @return 성공 여부 (실패: 0, 성공: 읽은 byte수 - 읽은 만큼 offset 이동)
+///////////////////////////////////////////////////////////////////////////////
+size_t bstring::read(byte_t* bstr, size_t n)
+{
+   	size_t nread = n;
+   	
+   	// 버퍼 오버플로우 방지
+	if (m_size < (m_offset + n)) nread = m_size - m_offset; 
+	    
+	memcpy(bstr, m_bstr+m_offset, nread);	
+	m_offset += nread;
+	
+	return nread;
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn void bstring::push(byte_t b)
+/// @brief	스트링 버퍼 끝에 b 추가
+/// @param	b	[in] 버퍼
+///////////////////////////////////////////////////////////////////////////////
+void bstring::push(byte_t b)
+{
+	append(&b, 1);
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn void bstring::pop()
+/// @brief	스트링 버퍼 끝 제거
+///////////////////////////////////////////////////////////////////////////////
+void bstring::pop()
+{
+	if (m_size > 0) m_bstr[--m_size] = '\0';
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn void bstring::erase(size_t n, int whence)
+/// @brief	버퍼 삭제
+/// @param	n		[in] 삭제할 길이
+/// @param	whence	[in] 삭제 모드 (0: 처음부터, 1: 현재 위치, 2: 마지막 부터)
+///////////////////////////////////////////////////////////////////////////////
+void bstring::erase(size_t n, int whence)
+{
+	// 문자열 처음 기준으로 삭제
+	if ((whence & BSTR_SET) == BSTR_SET)
+	{
+		size_t offset = n;
+		
+		// trim을 할 경우에는 탭, 공백, CRLF 문자 제거
+		if ((whence & BSTR_TRIM) == BSTR_TRIM)
+		{
+			for (size_t i = offset ; i < m_size; i++) 
+			{
+				if ((m_bstr[i] == '\t') || (m_bstr[i] == ' ') || 
+					(m_bstr[i] == '\r') || (m_bstr[i] == '\n')) ++offset;
+				else break;
+			}
+		}
+		
+		if (offset > m_size) offset = m_size;
+		
+		for (size_t i = offset ; i < m_size; i++) 
+			m_bstr[i-offset] = m_bstr[i];
+		
+		m_size -= offset;
+		m_bstr[m_size] = '\0';
+		
+		m_offset = 0;
+	}
+	// 현재 문자열 기준으로 삭제
+	else if ((whence & BSTR_CUR) == BSTR_CUR)
+	{
+		// 아무 동작 안함
+	}
+	// 문자열 마지막 기준으로 삭제
+	else if ((whence & BSTR_END) == BSTR_END)
+	{
+		size_t offset = m_size - n;
+		
+		// trim을 할 경우에는 탭, 공백, CRLF 문자 제거
+		if ((whence & BSTR_TRIM) == BSTR_TRIM)
+		{
+			for (size_t i = offset-1; i >= 0; --i)
+			{
+				if ((m_bstr[i] == '\t') || (m_bstr[i] == ' ') || 
+					(m_bstr[i] == '\r') || (m_bstr[i] == '\n')) --offset;
+				else break;
+			}
+		}
+		
+		if (offset < 0) offset = 0;
+		
+		m_size = offset;
+		m_bstr[m_size] = '\0';
+		
+		m_offset = 0;
+	}
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn bstring bstring::operator+ (const bstring& rhs)
+/// @brief	연산자(+) 오버로딩
+/// @param	rhs		[in] bstr 스트링
+///////////////////////////////////////////////////////////////////////////////
+bstring bstring::operator+ (const bstring& rhs)
+{
+	bstring tmp(*this);
+	
+	tmp.append(rhs.data(), rhs.size());
+	return (tmp);
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn bstring bstring::operator+ (const char* cstr)
+/// @brief	연산자(+) 오버로딩
+/// @param	cstr	[in] 버퍼
+///////////////////////////////////////////////////////////////////////////////
+bstring bstring::operator+ (const char* cstr)
+{
+	bstring tmp(*this);
+	
+	tmp.append(cstr);
+	return (tmp);
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn bstring operator+ (const bstring& lhs, const bstring& rhs)
+/// @brief	연산자(+) 오버로딩
+/// @param	lhs		[in] bstr 스트링
+/// @param	rhs		[in] bstr 스트링
+///////////////////////////////////////////////////////////////////////////////
+bstring operator+ (const bstring& lhs, const bstring& rhs)
+{
+	bstring tmp(lhs);
+	
+	tmp.append(rhs.data(), rhs.size());
+	return (tmp);
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn bstring operator+ (const bstring& lhs, const char* rhs)
+/// @brief	연산자(+) 오버로딩
+/// @param	lhs		[in] bstr 스트링
+/// @param	rhs		[in] cstr 스트링
+///////////////////////////////////////////////////////////////////////////////
+bstring operator+ (const bstring& lhs, const char* rhs)
+{
+	bstring tmp(lhs);
+	
+	tmp.append(rhs);
+	return (tmp);
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn bstring operator+ (const char* lhs, const bstring& rhs)
+/// @brief	연산자(+) 오버로딩
+/// @param	lhs		[in] cstr 스트링
+/// @param	rhs		[in] bstr 스트링
+///////////////////////////////////////////////////////////////////////////////
+bstring operator+ (const char* lhs, const bstring& rhs)
+{
+	bstring tmp(lhs);
+	
+	tmp.append(rhs.data(), rhs.size());
+	return (tmp);
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn bstring bstring::operator+= (const bstring & rhs)
+/// @brief	연산자(+=) 오버로딩
+/// @param	rhs		[in] bstr 스트링
+///////////////////////////////////////////////////////////////////////////////
+bstring& bstring::operator+= (const bstring & rhs)
+{
+	if (&rhs == this) return (*this);
+
+	this->append(rhs.data(), rhs.size());
+	return (*this);
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn bstring bstring::operator+= (const char* cstr)
+/// @brief	연산자(+=) 오버로딩
+/// @param	cstr	[in] 버퍼
+///////////////////////////////////////////////////////////////////////////////
+bstring& bstring::operator+= (const char* cstr)
+{
+	this->append(cstr);
+	return (*this);
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn bstring& bstring::operator= (const bstring& rhs)
+/// @brief	연산자(=) 오버로딩
+/// @param	rhs		[in] bstr 스트링
+///////////////////////////////////////////////////////////////////////////////
+bstring& bstring::operator= (const bstring& rhs)
+{
+	if (&rhs == this) return (*this);
+	
+	this->bstrcpy(rhs.data(), rhs.size());
+	return (*this);
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn bstring& bstring::operator= (const char* cstr)
+/// @brief	연산자(=) 오버로딩
+/// @param	cstr	[in] 버퍼
+///////////////////////////////////////////////////////////////////////////////
+bstring& bstring::operator= (const char* cstr)
+{
+	this->bstrcpy(cstr);
+	return (*this);
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn byte_t bstring::operator[] (size_t n) const
+/// @brief	연산자(=) 오버로딩
+/// @param	n	[in] 인덱스
+///////////////////////////////////////////////////////////////////////////////
+byte_t bstring::operator[] (size_t n) const
+{
+	return at(n);
+}
+
+
+///////////////////////////////////////////////////////////////////////////////
+/// @fn byte_t& bstring::operator[] (size_t n)
+/// @brief	연산자(=) 오버로딩
+/// @param	n	[in] 인덱스
+///////////////////////////////////////////////////////////////////////////////
+byte_t& bstring::operator[] (size_t n)
+{
+	return at(n);
+}
+
+__END_NAMESPACE_JFX

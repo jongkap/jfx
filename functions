@@ -1,0 +1,759 @@
+#!/bin/sh
+# functions: This file contains functions to be used by most or all
+#            shell scripts in the /etc/init.d directory.
+#
+# author: jongkap jeong <kbroad@mail.com>
+#
+# Copyright (C) Jongkap Jeong, Ltd. All Rights Reserved.
+#
+##############################################################################
+# Init Variables
+#
+HOST_OS=""
+PROCESSOR=""
+ECHO_N=""
+CPP=""
+CC=""
+CPP_VER=""
+CPPFLAGS=""
+LIBS=""
+LDFLAGS=""
+ARCH=""
+LFS_FLAGS=""
+DLIB_EXT=""
+SLIB_EXT="a"
+AR_FLAGS=""
+STRIP_FLAGS=""
+
+# Get Host OS
+HOST_OS=`exec uname -s 2> /dev/null`
+case $HOST_OS in
+    Linux* | linux* | GNU* | GNU/*)  HOST_OS="LINUX" ;;
+    CYGWIN* | Cygwin* | cygwin* )    HOST_OS="CYGWIN" ;;
+    UNIX_System_V* | UNIX_SV*)       HOST_OS="UNIX" ;;
+    SCO_SV* | OpenUNIX* | UnixWare*) HOST_OS="SCO" ;;
+    AIX*)    HOST_OS="AIX" ;;
+    HP-UX*)  HOST_OS="HP-UX" ;;
+    SunOS*)  HOST_OS="SUNOS" ;;
+    IRIX*)   HOST_OS="IRIX" ;;
+    QNX*)    HOST_OS="QNX" ;;
+    Darwin*) HOST_OS="MACINTOSH" ;;
+    OSF1*)   HOST_OS="OSF1" ;;
+    *)       HOST_OS="UNKNOWN" ;;
+esac
+
+PROCESSOR=`exec uname -p 2> /dev/null`
+case $PROCESSOR in
+    unknown* | UNKNOWN*) PROCESSOR=`exec uname -m 2> /dev/null` ;;
+esac
+if [ -z "$PROCESSOR" ] ; then
+    PROCESSOR=`exec uname -m 2> /dev/null`
+fi
+case $PROCESSOR in
+    i386* | i686* | athlon* | x86at*) PROCESSOR="i386" ;;
+    x86_64*)       PROCESSOR="x86_64" ;;
+    ia64*)         PROCESSOR="ia64" ;;
+    sparc*)        PROCESSOR="sparc" ;;
+    powerpc*)      PROCESSOR="powerpc" ;;
+    ppc64*)        PROCESSER="ppc64" ;;
+    parisc*)       PROCESSER="parisc" ;;
+    alpha*)        PROCESSOR="alpha" ;;
+    *)
+        case $HOST_OS in
+            AIX)   PROCESSOR="powerpc" ;;
+            HP-UX) 
+                   PROCESSOR=`exec model | grep "ia64"`
+                   if [ -z "$PROCESSOR" ] ; then
+                       PROCESSOR=`exec file /stand/vmunix 2> /dev/null | grep "PA-RISC 2.0"`
+                       if [ -z "$PROCESSOR" ] ; then
+                           PROCESSOR="parisc"
+                       else
+                           PROCESSOR="parisc2"
+                       fi
+                   else
+                       PROCESSOR="ia64"
+                   fi
+                   ;;
+            *)     PROCESSOR="UNKNOWN" ;;
+        esac
+	;;
+esac
+
+case `echo "testing\c"; echo 1,2,3`,`echo -n testing; echo 1,2,3` in
+    *c*,-n*) ECHO_N= ECHO_C='
+' ECHO_T='  ' ;;
+    *c*,*  ) ECHO_N=-n ECHO_C= ECHO_T= ;;
+    *)       ECHO_N= ECHO_C='\c' ECHO_T= ;;
+esac
+
+
+func_arch_aix()
+{
+    ARCH=`exec prtconf -c | grep 64`
+    if [ -n "$ARCH" ] ; then
+        ARCH="64"
+        return
+    fi
+
+    ARCH="32"
+}
+
+
+func_arch_sun()
+{
+    ARCH=`exec isainfo -b`
+    
+    if [ -z "$ARCH" ] ; then
+        ARCH="32"
+    fi
+}
+
+func_arch_hpux()
+{
+    ARCH=`exec getconf HW_CPU_SUPP_BITS | grep 64`
+    if [ -n "$ARCH" ] ; then
+        ARCH="64"
+        return
+    fi
+
+    ARCH=`exec getconf HW_CPU_SUPP_BITS | grep 32`
+    if [ -n "$ARCH" ] ; then
+        ARCH="32"
+        return
+    fi
+    
+    if [ -z "$ARCH" ] ; then
+        ARCH="32"
+    fi
+}
+
+func_arch_linux()
+{
+    case $PROCESSOR in
+        x86_64* | ia64* | sparc* | ppc64* | alpha*)  ARCH="64" ;;
+        *)                ARCH="32" ;;
+    esac
+}
+
+func_arch_sco()
+{
+    ARCH="32"
+}
+
+func_arch_mac()
+{
+    ARCH="32"
+}
+
+func_find_architecture()
+{
+    case $HOST_OS in
+        AIX)       func_arch_aix ;;
+        SUNOS)     func_arch_sun ;;
+        HP-UX)     func_arch_hpux ;;
+        LINUX)     func_arch_linux ;;
+        SCO)       func_arch_sco ;;
+        MACINTOSH) func_arch_mac ;;
+    esac
+
+    if [ -z "$ARCH" ] ; then
+        ARCH="32"
+    fi
+}
+
+func_version_cpp()
+{
+    # check GNU g++ (Linux or GNU platform)
+    CPP_VER=`exec $1 -v 2>&1 | grep "gcc version"`
+    if [ -n "$CPP_VER" ] ; then
+        CPP="$1"
+        CC="gcc"
+        return
+    fi
+
+    # check Visual Age C++ (AIX)
+    # VACPP 7
+    CPP_VER=`exec $1 -v 2>&1 | grep Edition`
+    if [ -z "$CPP_VER" ] ; then
+        # VACPP 6
+        CPP_VER=`exec $1 -v 2>&1 | grep Version`
+    fi
+    if [ -z "$CPP_VER" ] ; then
+        # VACPP 5
+        CPP_VER=`exec $1 -v 2>&1 | grep Compiler | grep -v Guide`
+    fi
+    if [ -n "$CPP_VER" ] ; then
+        CPP="$1"
+        CC="xlc_r"
+        return
+    fi
+
+    # check Sun WorkShop C++ / UDK (Solaris/UnixWare)
+    CPP_VER=`exec $1 -V 2>&1 | grep C++`
+    if [ -n "$CPP_VER" ] ; then
+        CPP="$1"
+        CC="cc"
+        return
+    fi
+
+    # check HP aCC C++ (HP-UX)
+    CPP_VER=`exec $1 -V 2>&1 | grep aC++`
+    if [ -n "$CPP_VER" ] ; then
+        CPP="$1"
+        CC="cc"
+        return
+    fi
+
+    # check General C++ 
+    CPP_VER=`exec $1 -V 2>&1 | grep er`
+    if [ -n "$CPP_VER" ] ; then
+        CPP="$1"
+        CC="cc"
+        return
+    fi
+}
+
+func_find_cpp()
+{
+    # find cpp whith os dependent
+    if [ -z "$CPP" ] ; then
+        case $HOST_OS in
+            AIX)       func_version_cpp xlC_r ;;
+            SUNOS)     func_version_cpp CC ;;
+            SCO)       func_version_cpp CC ;;
+            HP-UX)     func_version_cpp aCC ;;
+            MACINTOSH) func_version_cpp g++ ;;
+            LINUX)     func_version_cpp g++ ;;
+            *)         func_version_cpp CC ;;
+        esac
+    else
+        func_version_cpp $CPP
+    fi
+
+    # find g++ (gnu C++ compiler)
+    if [ -z "$CPP_VER" ] ; then
+        func_version_cpp g++
+    fi
+
+    # find CC (ansi C++ compiler)
+    if [ -z "$CPP_VER" ] ; then
+        func_version_cpp CC
+    fi
+}
+
+func_lfs_flags()
+{
+    if [ "$LARGE_FILE" = "no" ] ; then
+        LFS_FLAGS="disable"
+        return
+    fi
+    
+    case $CPP in
+        *xlC_r | *xlC)
+              case $FILETYPE in
+                  32)  LFS_FLAGS="-D_LARGE_FILES -qlonglong" ;;
+                  64)  LFS_FLAGS="-D_LARGE_FILES" ;;
+              esac
+              ;;
+        *) LFS_FLAGS="-D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 -D_LARGEFILE64_SOURCE" ;;
+    esac
+}
+
+func_dlib_ext()
+{
+    case $HOST_OS in
+        AIX)       DLIB_EXT="a" ;;
+        SUNOS)     DLIB_EXT="so" ;;
+        SCO)       DLIB_EXT="so" ;;
+        HP-UX)     
+                   case $PROCESSOR in
+                       ia64*)  DLIB_EXT="so" ;;
+                       *)      DLIB_EXT="sl" ;;
+                   esac
+                   ;;
+        MACINTOSH) DLIB_EXT="dylib" ;;
+        LINUX)     DLIB_EXT="so" ;;
+        *)         DLIB_EXT="so" ;;
+    esac
+}
+
+func_dlib_gnu_option()
+{
+    if [ -n "$CPPFLAGS" ] ; then
+        return
+    fi
+
+    case $HOST_OS in
+        MACINTOSH) CPPFLAGS="-Wall -O2 -fno-common -D_REENTRANT" ;;
+        *)         CPPFLAGS="-Wall -O2 -fPIC -D_REENTRANT" ;;
+    esac
+    
+    case $FILETYPE in
+        32)
+            case $HOST_OS in
+                MACINTOSH)
+                    CPPFLAGS="$CPPFLAGS -mpowerpc"
+                    LDFLAGS="-mpowerpc"
+                    ;;
+                LINUX)
+                    if [ "$ARCH" != "$FILETYPE" ]; then
+                        CPPFLAGS="$CPPFLAGS -m32"
+                        LDFLAGS="-m32"
+                    fi
+                    ;;
+            esac               
+            ;;
+        64)
+            case $HOST_OS in
+                MACINTOSH)
+                    CPPFLAGS="$CPPFLAGS -mpowerpc64"
+                    LDFLAGS="-mpowerpc64"
+                    ;;
+                *)
+                    if [ "$ARCH" != "$FILETYPE" ]; then
+                        CPPFLAGS="$CPPFLAGS -m64"
+                        LDFLAGS="-m64"
+                    fi
+                    ;;
+            esac               
+            ;;
+    esac
+    
+    if [ "$LARGE_FILE" = "yes" ] ; then
+        CPPFLAGS="$CPPFLAGS $LFS_FLAGS"
+    fi
+    
+    case $HOST_OS in
+        MACINTOSH)
+            if [ -n "$LDFLAGS" ] ; then
+                LDFLAGS="$LDFLAGS -dynamiclib"
+            else
+                LDFLAGS="-dynamiclib"
+            fi
+            ;;
+        SUNOS)
+            if [ -n "$LDFLAGS" ] ; then
+                LDFLAGS="$LDFLAGS -shared -Wl,-h,lib\$@.so"
+            else
+                LDFLAGS="-shared -Wl,-h,lib\$@.so"
+            fi
+            ;;
+        HP-UX)
+            if [ -n "$LDFLAGS" ] ; then
+                LDFLAGS="$LDFLAGS -shared -fPIC -Wl,-b,-E"
+            else
+                LDFLAGS="-shared -fPIC -Wl,-b,-E"
+            fi
+            ;;
+        *)
+            if [ -n "$LDFLAGS" ] ; then
+                LDFLAGS="$LDFLAGS -shared -Wl,-soname,lib\$@.so"
+            else
+                LDFLAGS="-shared -Wl,-soname,lib\$@.so"
+            fi
+            ;;
+    esac    
+    
+    if [ -n "$LIBS" ] ; then
+        return
+    fi
+ 
+    case $HOST_OS in
+        SUNOS)    LIBS="-lsocket -lnsl -lrt" ;;
+    esac
+}
+
+
+func_slib_gnu_option()
+{
+    if [ -n "$CPPFLAGS" ] ; then
+        return
+    fi
+
+    CPPFLAGS="-Wall -O2 -fPIC -D_REENTRANT"
+    
+    case $FILETYPE in
+        32)
+            case $HOST_OS in
+                MACINTOSH)
+                    CPPFLAGS="$CPPFLAGS -mpowerpc"
+                    LDFLAGS="-mpowerpc"
+                    ;;
+                LINUX)
+                    if [ "$ARCH" != "$FILETYPE" ]; then
+                        CPPFLAGS="$CPPFLAGS -m32"
+                        LDFLAGS="-m32"
+                    fi
+                    ;;
+            esac               
+            ;;
+        64)
+            case $HOST_OS in
+                MACINTOSH)
+                    CPPFLAGS="$CPPFLAGS -mpowerpc64"
+                    LDFLAGS="-mpowerpc64"
+                    ;;
+                LINUX)
+                    if [ "$ARCH" != "$FILETYPE" ]; then
+                        CPPFLAGS="$CPPFLAGS -m64"
+                        LDFLAGS="-m64"
+                    fi
+                    ;;
+            esac               
+            ;;
+    esac
+    
+    if [ "$LARGE_FILE" = "yes" ] ; then
+        CPPFLAGS="$CPPFLAGS $LFS_FLAGS"
+    fi
+    
+    case $HOST_OS in
+        HP-UX)    LDFLAGS="$LDFLAGS -Wl,+s" ;;
+    esac
+
+    if [ -n "$LIBS" ] ; then
+        return
+    fi
+
+    case $HOST_OS in
+        SUNOS)    LIBS="-lsocket -lnsl -lresolv -lrt" ;;
+    esac
+}
+
+func_app_gnu_option()
+{
+    if [ -n "$CPPFLAGS" ] ; then
+        return
+    fi
+
+    CPPFLAGS="-Wall -O2 -D_REENTRANT"
+    
+    case $FILETYPE in
+        32)
+            case $HOST_OS in
+                MACINTOSH)
+                    CPPFLAGS="$CPPFLAGS -mpowerpc"
+                    LDFLAGS="-mpowerpc"
+                    ;;
+                LINUX)
+                    if [ "$ARCH" != "$FILETYPE" ]; then
+                        CPPFLAGS="$CPPFLAGS -m32"
+                        LDFLAGS="-m32"
+                    fi
+                    ;;
+            esac               
+            ;;
+        64)
+            case $HOST_OS in
+                MACINTOSH)
+                    CPPFLAGS="$CPPFLAGS -mpowerpc64"
+                    LDFLAGS="-mpowerpc64"
+                    ;;
+                LINUX)
+                    if [ "$ARCH" != "$FILETYPE" ]; then
+                        CPPFLAGS="$CPPFLAGS -m64"
+                        LDFLAGS="-m64"
+                    fi
+                    ;;
+            esac               
+            ;;
+    esac
+    
+    if [ "$LARGE_FILE" = "yes" ] ; then
+        CPPFLAGS="$CPPFLAGS $LFS_FLAGS"
+    fi
+    
+    case $HOST_OS in
+        HP-UX)    LDFLAGS="$LDFLAGS -Wl,+s" ;;
+    esac
+
+    if [ -n "$LIBS" ] ; then
+        return
+    fi
+
+    case $HOST_OS in
+        SUNOS)    LIBS="-lsocket -lnsl -lresolv -lrt" ;;
+    esac
+
+    # fix gcc ver 3.2.3 problems
+    FIXABLE_VER=`echo $CPP_VER | grep 3.2.3`
+
+    if [ -n "$FIXABLE_VER" ] ; then
+        if [ -n "$LIBS" ] ; then
+            LIBS="$LIBS -lgcc_s"
+        else
+            LIBS="-lgcc_s"
+        fi
+    fi
+}
+
+func_dlib_workshop_option()
+{
+    if [ -n "$CPPFLAGS" ] ; then
+        return
+    fi
+
+    CPPFLAGS="-w -O2 -KPIC"
+
+    if [ "$FILETYPE" = "64" ] ; then
+        CPPFLAGS="$CPPFLAGS -xarch=v9"
+        LDFLAGS="-xarch=v9"
+    fi
+   
+    if [ "$LARGE_FILE" = "yes" ] ; then
+        CPPFLAGS="$CPPFLAGS $LFS_FLAGS -D_REENTRANT"
+    fi
+
+    if [ -n "$LDFLAGS" ] ; then
+        LDFLAGS="$LDFLAGS -dy -G"
+    else 
+        LDFLAGS="-dy -G"
+    fi
+    
+    if [ -n "$LIBS" ] ; then
+        return
+    fi
+
+    LIBS="-lsocket -lnsl -lresolv -lrt" 
+}
+
+func_app_workshop_option()
+{
+    if [ -n "$CPPFLAGS" ] ; then
+        return
+    fi
+
+    CPPFLAGS="-w -O2"
+
+    if [ "$FILETYPE" = "64" ] ; then
+        CPPFLAGS="$CPPFLAGS -xarch=v9"
+        LDFLAGS="-xarch=v9"
+    fi
+   
+    if [ "$LARGE_FILE" = "yes" ] ; then
+        CPPFLAGS="$CPPFLAGS $LFS_FLAGS -D_REENTRANT"
+    fi
+    
+    if [ -n "$LIBS" ] ; then
+        return
+    fi
+
+    LIBS="-lsocket -lnsl -lresolv -lrt" 
+}
+
+func_dlib_udk_option()
+{
+    if [ -n "$CPPFLAGS" ] ; then
+        return
+    fi
+
+    CPPFLAGS="-O -Kthread -KPIC"
+
+    if [ "$LARGE_FILE" = "yes" ] ; then
+        CPPFLAGS="$CPPFLAGS $LFS_FLAGS"
+    fi
+
+    if [ -n "$LDFLAGS" ] ; then
+        LDFLAGS="$LDFLAGS -G"
+    else 
+        LDFLAGS="-G"
+    fi
+    
+    if [ -n "$LIBS" ] ; then
+        return
+    fi
+
+    LIBS="-lsocket -lnsl"
+}
+
+func_app_udk_option()
+{
+    if [ -n "$CPPFLAGS" ] ; then
+        return
+    fi
+
+    CPPFLAGS="-Kthread"
+
+    if [ "$LARGE_FILE" = "yes" ] ; then
+        CPPFLAGS="$CPPFLAGS $LFS_FLAGS"
+    fi
+
+    if [ -n "$LIBS" ] ; then
+        return
+    fi
+
+    LIBS="-lsocket -lnsl"
+}
+
+func_dlib_visualage_option()
+{
+    if [ -n "$CPPFLAGS" ] ; then
+        return
+    fi
+
+    CPPFLAGS="-qstaticinline -bhalt:5 -O2"
+    
+    if [ "$FILETYPE" = "64" ] ; then
+        CPPFLAGS="$CPPFLAGS -q64"
+        LDFLAGS="-q64"
+    fi
+
+    if [ "$LARGE_FILE" = "yes" ] ; then
+        CPPFLAGS="$CPPFLAGS $LFS_FLAGS"
+    fi
+    
+    if [ -n "$LDFLAGS" ] ; then
+        LDFLAGS="$LDFLAGS -G"
+    else 
+        LDFLAGS="-G"
+    fi
+
+    AR_FLAGS="-X$FILETYPE"
+    STRIP_FLAGS="-X$FILETYPE"
+   
+    if [ -n "$LIBS" ] ; then
+        return
+    fi
+}
+
+func_app_visualage_option()
+{
+    if [ -n "$CPPFLAGS" ] ; then
+        return
+    fi
+
+    CPPFLAGS="-qstaticinline -bhalt:5 -O2"
+    
+    if [ "$FILETYPE" = "64" ] ; then
+        CPPFLAGS="$CPPFLAGS -q64"
+        LDFLAGS="-q64"
+    fi
+
+    if [ "$LARGE_FILE" = "yes" ] ; then
+        CPPFLAGS="$CPPFLAGS $LFS_FLAGS"
+    fi
+
+    AR_FLAGS="-X$FILETYPE"
+    STRIP_FLAGS="-X$FILETYPE"
+    
+    if [ -n "$LIBS" ] ; then
+        return
+    fi
+}
+
+func_dlib_hpacpp_option()
+{
+    if [ -n "$CPPFLAGS" ] ; then
+        return
+    fi
+
+    CPPFLAGS="-AA +z -ext -mt -w +p"
+    
+    case $FILETYPE in
+        32)
+            CPPFLAGS="$CPPFLAGS +DD32"
+            LDFLAGS="+DD32"
+            ;;
+        64)
+            CPPFLAGS="$CPPFLAGS +DD64"
+            LDFLAGS="+DD64"
+            ;;
+    esac
+    
+    if [ "$LARGE_FILE" = "yes" ] ; then
+        CPPFLAGS="$CPPFLAGS $LFS_FLAGS"
+    fi
+    
+    if [ -n "$LDFLAGS" ] ; then
+        LDFLAGS="$LDFLAGS -b"
+    else 
+        LDFLAGS="-b"
+    fi
+    
+    if [ -n "$LIBS" ] ; then
+        return
+    fi
+}
+
+func_app_hpacpp_option()
+{
+    if [ -n "$CPPFLAGS" ] ; then
+        return
+    fi
+
+    CPPFLAGS="-AA -ext -mt -w +p"
+    
+    case $FILETYPE in
+        32)
+            CPPFLAGS="$CPPFLAGS +DD32"
+            LDFLAGS="+DD32"
+            ;;
+        64)
+            CPPFLAGS="$CPPFLAGS +DD64"
+            LDFLAGS="+DD64"
+            ;;
+    esac
+    
+    if [ "$LARGE_FILE" = "yes" ] ; then
+        CPPFLAGS="$CPPFLAGS $LFS_FLAGS"
+    fi
+    
+    LDFLAGS="$LDFLAGS -Wl,+s"
+    
+    if [ -n "$LIBS" ] ; then
+        return
+    fi
+
+    LIBS="-lnsl -lsec -lrt -lstd_v2 -lCsup_v2 -lm"
+}
+
+func_dlib_compile_option()
+{
+    case $CPP in
+        *g++) func_dlib_gnu_option ;;
+        *xlC_r | *xlC) func_dlib_visualage_option ;;
+        *aCC) func_dlib_hpacpp_option ;;
+        *CC)  
+              case $HOST_OS in
+                  SUNOS)  func_dlib_workshop_option ;;
+                  SCO)    func_dlib_udk_option ;;
+                  *)      echo "error: C++ compiler not exist!"; exit 1 ;;
+              esac
+              ;;
+        *)    echo "error: C++ compiler not exist!"; exit 1 ;;
+    esac
+}
+
+func_slib_compile_option()
+{
+    case $CPP in
+        *g++) func_slib_gnu_option ;;
+        *xlC_r | *xlC) func_app_visualage_option ;;
+        *aCC) func_app_hpacpp_option ;;
+        *CC)  
+              case $HOST_OS in
+                  SUNOS)  func_app_workshop_option ;;
+                  SCO)    func_app_udk_option ;;
+                  *)      echo "error: C++ compiler not exist!"; exit 1 ;;
+              esac
+              ;;
+        *)    echo "error: C++ compiler not exist!"; exit 1 ;;
+    esac
+}
+
+func_app_compile_option()
+{
+    case $CPP in
+        *g++) func_app_gnu_option ;;
+        *xlC_r | *xlC) func_app_visualage_option ;;
+        *aCC) func_app_hpacpp_option ;;
+        *CC)  
+              case $HOST_OS in
+                  SUNOS)  func_app_workshop_option ;;
+                  SCO)    func_app_udk_option ;;
+                  *)      echo "error: C++ compiler not exist!"; exit 1 ;;
+              esac
+              ;;
+        *)    echo "error: C++ compiler not exist!"; exit 1 ;;
+    esac
+}

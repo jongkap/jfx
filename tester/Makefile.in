@@ -1,0 +1,48 @@
+## Makefile
+## 
+## Description  : tester Makefile.
+## Author       : Jongkap Jeong (jongkap@mail.com)
+##
+## Copyright (C) Jongkap Jeong, Ltd. All Rights Reserved.
+## 
+###############################################################################
+
+PRJ_PATH = ..
+BIN_PATH = .
+INC_PATH = $(PRJ_PATH)/include
+LIB_PATH = $(PRJ_PATH)/@LIBOUTPUT@
+
+PROGS = tester
+
+all: $(PROGS)
+
+CPP = @CPP@
+
+CPPFLAGS = -I$(INC_PATH) @CPPFLAGS@
+LIB = -L$(LIB_PATH) -ljfx12 -lpthread @LIBS@
+
+SRCS =	\
+	tester.cpp
+
+OBJS = $(SRCS:.cpp=.o)
+
+.SUFFIXES: .cpp .o
+
+.cpp.o:
+	$(CPP) $(CPPFLAGS) -c $<
+
+$(PROGS): $(OBJS)
+	$(CPP) @LDFLAGS@ -o $@ $(OBJS) $(LIB)
+
+clean:
+	rm -f $(PROGS) *.o
+
+install:
+	cp -f $(PROGS) $(BIN_PATH)/$(PROGS)
+
+distclean:
+	rm -f $(BIN_PATH)/$(PROGS)
+
+cleanall:
+	rm -f $(PROGS) *.o
+	rm -f $(BIN_PATH)/$(PROGS)

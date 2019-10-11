@@ -1,0 +1,104 @@
+#!/bin/sh
+# configure: Guess values for system-dependent variables and create Makefiles.
+#
+# author: jongkap jeong <kbroad@mail.com>
+#
+# Copyright (C) Jongkap Jeong, Ltd. All Rights Reserved.
+#
+##############################################################################
+
+# Source function library.
+. ../functions
+
+FILETYPE=""
+LIBOUTPUT=""
+
+func_get_environment()
+{
+    echo "checking system type... $HOST_OS on $PROCESSOR"
+
+    echo $ECHO_N "checking architecture... $ECHO_C"
+    func_find_architecture
+    echo "$ARCH"-bit processor
+
+    echo $ECHO_N "checking for C++ compiler... $ECHO_C"
+    func_find_cpp
+    echo "$CPP"
+    if [ -z "$CPP" ] ; then
+      echo "error: C++ compiler not exist!"
+      exit 1
+    fi 
+    echo $ECHO_N "checking for C++ compiler version... $ECHO_C"
+    echo "$CPP_VER"
+    
+    echo $ECHO_N "checking for output file type... $ECHO_C"
+    if [ -z "$FILETYPE" ] ; then
+        FILETYPE="$ARCH"
+    else
+        if [ "$FILETYPE" != "64" ] ; then
+            FILETYPE=32
+        fi
+    fi
+    echo "$FILETYPE"-bit library
+    
+    echo $ECHO_N "checking for output path... $ECHO_C"
+    if [ "$FILETYPE" == "64" ] ; then
+        LIBOUTPUT="lib64"
+    else
+        LIBOUTPUT="lib"
+    fi
+    echo "$LIBOUTPUT"
+
+    echo $ECHO_N "checking for static library extention... $ECHO_C"
+    echo "$SLIB_EXT"
+    
+    func_slib_compile_option
+}
+
+func_create_makefile()
+{
+    echo "configure: creating Makefile"
+    sed "{ s/@CPP@/$CPP/g; s/@CPPFLAGS@/$CPPFLAGS/g; s/@LIBS@/$LIBS/g; s/@FILETYPE@/$FILETYPE/g; s/@LIBOUTPUT@/$LIBOUTPUT/g; s/@LDFLAGS@/$LDFLAGS/g; s/@SLIB_EXT@/$SLIB_EXT/g; s/@AR_FLAGS@/$AR_FLAGS/g; }" Makefile.in > Makefile
+}
+
+func_clean_makefile()
+{
+    rm -f Makefile > /dev/null 2>&1
+}
+
+
+main()
+{
+    func_get_environment
+    func_create_makefile
+}
+
+help()
+{
+    echo
+    echo "usage: configure [options]"
+    echo "options: clean"
+    echo "         --with-cpp=CPP            C++ preprocessor"
+    echo "         --with-cppflags=CPPFLAGS  C++ preprocessor flags, e.g. -I<include dir>"
+    echo "         --with-lib=LIBS           linker flags, e.g. -L<lib dir>"
+    echo "         --with-output=FILETYPE    32/64 bit file type"
+    echo "                                   FILETYPE: [32/64]"
+}
+
+###############################################################################
+# Check argument
+for arg in $* ; do
+    case $arg in
+        --with-cpp=*)            CPP=`echo "$arg" | sed 's/[-_a-zA-Z0-9]*=//'` ;;
+        --with-cppflags=*)  CPPFLAGS=`echo "$arg" | sed 's/[-_a-zA-Z0-9]*=//'` ;;
+        --with-lib=*)            LIB=`echo "$arg" | sed 's/[-_a-zA-Z0-9]*=//'` ;;
+        --with-output=*)    FILETYPE=`echo "$arg" | sed 's/[-_a-zA-Z0-9]*=//'` ;;
+        --help) help; exit 1 ;;
+        clean) func_clean_makefile; exit 0 ;;
+        *) help; exit 1 ;;
+    esac
+done
+
+###############################################################################
+# main function
+main

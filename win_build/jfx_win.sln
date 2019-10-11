@@ -1,0 +1,38 @@
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "jfx_win", "jfx_win.vcproj", "{93661613-40AE-4381-B260-1C980793DD21}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "jfx_win_tester", "..\tester\win_build\jfx_win_tester.vcproj", "{5EB7CF89-F151-4FC1-BEB8-73388882DA84}"
+	ProjectSection(ProjectDependencies) = postProject
+		{93661613-40AE-4381-B260-1C980793DD21} = {93661613-40AE-4381-B260-1C980793DD21}
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Debug|x64 = Debug|x64
+		Release|Win32 = Release|Win32
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{93661613-40AE-4381-B260-1C980793DD21}.Debug|Win32.ActiveCfg = Debug|Win32
+		{93661613-40AE-4381-B260-1C980793DD21}.Debug|Win32.Build.0 = Debug|Win32
+		{93661613-40AE-4381-B260-1C980793DD21}.Debug|x64.ActiveCfg = Debug|x64
+		{93661613-40AE-4381-B260-1C980793DD21}.Debug|x64.Build.0 = Debug|x64
+		{93661613-40AE-4381-B260-1C980793DD21}.Release|Win32.ActiveCfg = Release|Win32
+		{93661613-40AE-4381-B260-1C980793DD21}.Release|Win32.Build.0 = Release|Win32
+		{93661613-40AE-4381-B260-1C980793DD21}.Release|x64.ActiveCfg = Release|x64
+		{93661613-40AE-4381-B260-1C980793DD21}.Release|x64.Build.0 = Release|x64
+		{5EB7CF89-F151-4FC1-BEB8-73388882DA84}.Debug|Win32.ActiveCfg = Debug|Win32
+		{5EB7CF89-F151-4FC1-BEB8-73388882DA84}.Debug|Win32.Build.0 = Debug|Win32
+		{5EB7CF89-F151-4FC1-BEB8-73388882DA84}.Debug|x64.ActiveCfg = Debug|x64
+		{5EB7CF89-F151-4FC1-BEB8-73388882DA84}.Debug|x64.Build.0 = Debug|x64
+		{5EB7CF89-F151-4FC1-BEB8-73388882DA84}.Release|Win32.ActiveCfg = Release|Win32
+		{5EB7CF89-F151-4FC1-BEB8-73388882DA84}.Release|Win32.Build.0 = Release|Win32
+		{5EB7CF89-F151-4FC1-BEB8-73388882DA84}.Release|x64.ActiveCfg = Release|x64
+		{5EB7CF89-F151-4FC1-BEB8-73388882DA84}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
